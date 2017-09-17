@@ -2,19 +2,19 @@
 % Please edit documentation in R/line_functions.R
 \name{make_scan_lines}
 \alias{make_scan_lines}
-\title{Generate radial scan lines from one or more start points}
+\title{Generate radial scan lines from one or more locations}
 \usage{
 make_scan_lines(nlines, locations, lengths, angles = NULL)
 }
 \arguments{
 \item{nlines}{Number of lines to generate for each point.}
 
-\item{locations}{One or more start points represented by one of:
+\item{locations}{One or more locations represented by one of:
 \itemize{
-  \item{A vector of X and Y values for a single point;}
+  \item{A vector of X and Y values for a single location;}
   \item{A two-column matrix or data.frame of X and Y values (in that order).}
   \item{An sf object with POINT or MULTIPOINT features. In this case the
-    map projection of the points (if defined) will be set for the output
+    map projection of the input data (if defined) will be set for the output
     scan lines.}
 }}
 
@@ -27,15 +27,15 @@ function that returns a vector of directions; or \code{NULL}
 for uniform distribution of line angles.}
 }
 \value{
-An \code{sf} object (data frame) with columns pointid (integer),
+An \code{sf} object (data frame) with columns locationid (integer),
   lineid (integer) and geometry (LINESTRING).
 }
 \description{
-Given a set of point locations, this function generates a set of \code{n}
-radial scan lines emanating from each point. Line lengths can be constant;
-individually specified; or set by a user-provided function (e.g. to draw them
-from a particular distribution). Line angles can be regularly spaced (the
-default); individually specified; or set by a user-provided function.
+This function generates a set of \code{n} radial scan lines emanating from
+each of a given set of locations. Line lengths can be constant; individually
+specified; or set by a user-provided function (e.g. to draw them from a
+particular distribution). Line angles can be regularly spaced (the default);
+individually specified; or set by a user-provided function.
 }
 \examples{
 # Some random point locations in a 20x20km area

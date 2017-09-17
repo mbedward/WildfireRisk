@@ -15,8 +15,8 @@ sample_raster(r, lines, spacing = NULL)
 (the default), this will be set to half the cell width of the raster layer.}
 }
 \value{
-A data frame with columns pointid and lineid (both taken from the input
-  \code{lines} object), sampleid and value.
+An \code{sf} object with columns locationid, lineid (both taken from the input
+  \code{lines} object), sampleid, value and geometry (sample point).
 }
 \description{
 This function takes a raster layer and a samples cell values at regularly
@@ -38,7 +38,8 @@ vals <- sample_raster(r.tsf, lines)
 library(dplyr)
 
 vals \%>\%
-  group_by(pointid) \%>\%
+  as.data.frame() \%>\%
+  group_by(locationid) \%>\%
   summarize(tsf = median(value, na.rm = TRUE))
 
 }

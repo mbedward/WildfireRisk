@@ -1,19 +1,19 @@
-#' Generate radial scan lines from one or more start points
+#' Generate radial scan lines from one or more locations
 #'
-#' Given a set of point locations, this function generates a set of \code{n}
-#' radial scan lines emanating from each point. Line lengths can be constant;
-#' individually specified; or set by a user-provided function (e.g. to draw them
-#' from a particular distribution). Line angles can be regularly spaced (the
-#' default); individually specified; or set by a user-provided function.
+#' This function generates a set of \code{n} radial scan lines emanating from
+#' each of a given set of locations. Line lengths can be constant; individually
+#' specified; or set by a user-provided function (e.g. to draw them from a
+#' particular distribution). Line angles can be regularly spaced (the default);
+#' individually specified; or set by a user-provided function.
 #'
 #' @param nlines Number of lines to generate for each point.
 #'
-#' @param locations One or more start points represented by one of:
+#' @param locations One or more locations represented by one of:
 #'   \itemize{
-#'     \item{A vector of X and Y values for a single point;}
+#'     \item{A vector of X and Y values for a single location;}
 #'     \item{A two-column matrix or data.frame of X and Y values (in that order).}
 #'     \item{An sf object with POINT or MULTIPOINT features. In this case the
-#'       map projection of the points (if defined) will be set for the output
+#'       map projection of the input data (if defined) will be set for the output
 #'       scan lines.}
 #'   }
 #'
@@ -25,7 +25,7 @@
 #'   function that returns a vector of directions; or \code{NULL}
 #'   for uniform distribution of line angles.
 #'
-#' @return An \code{sf} object (data frame) with columns pointid (integer),
+#' @return An \code{sf} object (data frame) with columns locationid (integer),
 #'   lineid (integer) and geometry (LINESTRING).
 #'
 #' @examples
@@ -53,6 +53,8 @@ make_scan_lines <- function(nlines, locations, lengths, angles = NULL) {
   }
   else if (is.data.frame(locations))
     centres <- as.matrix(locations[, 1:2])
+  else if (is.matrix(locations))
+    centres <- locations
   else if (is.vector(locations))
     centres <- matrix(locations[1:2], ncol = 2)
 
@@ -105,7 +107,7 @@ make_scan_lines <- function(nlines, locations, lengths, angles = NULL) {
                       st_linestring(matrix(c(x0, x1, y0, y1), ncol = 2))
                     })
 
-      st_sf(pointid = i, lineid = 1:nlines, geometry = st_sfc(lines))
+      st_sf(locationid = i, lineid = 1:nlines, geometry = st_sfc(lines))
     })
 
   do.call(rbind, lines)
@@ -129,8 +131,8 @@ make_scan_lines <- function(nlines, locations, lengths, angles = NULL) {
 #' @param spacing Spacing between adjacent sample points. If \code{NULL}
 #'   (the default), this will be set to half the cell width of the raster layer.
 #'
-#' @return A data frame with columns pointid and lineid (both taken from the input
-#'   \code{lines} object), sampleid and value.
+#' @return An \code{sf} object with columns locationid, lineid (both taken from the input
+#'   \code{lines} object), sampleid, value and geometry (sample point).
 #'
 #' @examples
 #' \dontrun{
@@ -143,7 +145,8 @@ make_scan_lines <- function(nlines, locations, lengths, angles = NULL) {
 #' library(dplyr)
 #'
 #' vals %>%
-#'   group_by(pointid) %>%
+#'   as.data.frame() %>%
+#'   group_by(locationid) %>%
 #'   summarize(tsf = median(value, na.rm = TRUE))
 #'
 #' }
@@ -167,13 +170,18 @@ sample_raster <- function(r, lines, spacing = NULL) {
   dat <- lapply(1:nrow(lines),
                 function(i) {
                   mp <- mpts[[i]]
+
                   p <- sf::st_cast( sf::st_geometry(mp), "POINT" )
+
                   x <- raster::extract(r, as(p, "Spatial"))
-                  data.frame(pointid = lines$pointid[i],
-                             lineid = lines$lineid[i],
-                             sampleid = 1:length(x),
-                             value = x)
+
+                  st_sf(locationid = lines$locationid[i],
+                        lineid = lines$lineid[i],
+                        sampleid = 1:length(x),
+                        value = x,
+                        geometry = st_sfc(p))
                 })
 
   do.call(rbind, dat)
 }
+
