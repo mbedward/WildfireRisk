@@ -115,29 +115,32 @@ make_scan_lines <- function(nlines, locations, lengths, angles = NULL) {
 
 
 
-#' Sample a raster layer at points along scan lines
+#' Sample one or more raster layers at points along scan lines
 #'
-#' This function takes a raster layer and a samples cell values at regularly
+#' This function takes one or more raster layers and samples cell values at regularly
 #' spaced points along a given set of scan lines. The scan lines are provided
 #' as an \code{sf} object as produced by \code{\link{make_scan_lines}}.
 #'
-#' @note If the raster object has multiple layers (ie. a RasterStack or RasterBrick
+#' @note If a raster object has multiple layers (ie. a RasterStack or RasterBrick
 #'   object) a warning will be issued and only the first layer will be sampled.
 #'
-#' @param r The raster layer to be sampled.
+#' @param x Either a single Raster object or a list of Raster objects to sample.
+#'   If a named list, the names will be used as the column names for sample values
+#'   in the returned data frame.
 #'
 #' @param lines An \code{sf} object containing scan lines for point locations.
 #'
 #' @param spacing Spacing between adjacent sample points. If \code{NULL}
 #'   (the default), this will be set to half the cell width of the raster layer.
 #'
-#' @return An \code{sf} object with columns locationid, lineid (both taken from the input
-#'   \code{lines} object), sampleid, value and geometry (sample point).
+#' @return An \code{sf} object with columns: locationid, lineid (both taken from the input
+#'   \code{lines} object), sampleid, geometry (sample point) and a column of
+#'   sample values for each of the input rasters.
 #'
 #' @examples
 #' \dontrun{
 #'
-#' # Sample a raster layer of time since fire values
+#' # First example: sample a single raster layer of time since fire values
 #' vals <- sample_raster(r.tsf, lines)
 #'
 #' # Calculate median time since fire value for the central point
@@ -149,39 +152,86 @@ make_scan_lines <- function(nlines, locations, lengths, angles = NULL) {
 #'   group_by(locationid) %>%
 #'   summarize(tsf = median(value, na.rm = TRUE))
 #'
+#'
+#' # Second example: sample two raster layers for time since fire and
+#' # presence of forest cover
+#' rr <- list(r.tsf, r.forest)
+#' vals <- sample_raster(rr, lines)
 #' }
+#'
+#' @importFrom sf st_bind_cols st_cast st_coordinates st_geometry st_sf st_line_sample
 #'
 #' @export
 #'
-sample_raster <- function(r, lines, spacing = NULL) {
+sample_raster <- function(x, lines, spacing = NULL) {
 
-  if (raster::nlayers(r) > 1) {
-    warning("Only sampling first layer of multi-layer raster")
-    r <- raster::subset(r, 1)
+  if (inherits(x, "Raster")) {
+    x <- list(x)
+    names(x) <- deparse(substitute(x))
+  }
+  else if (is.list(x)) {
+    # check all list elements are rasters
+    is.r <- sapply(x, function(obj) inherits(obj, "Raster"))
+    if (!all(is.r)) stop("All elements in the input list must be Raster objects")
+
+    # check names and set if missing
+    nm <- names(x)
+    if (is.null(nm)) names(x) <- paste0("layer", 1:length(x))
+    else {
+      blanks <- nm == ""
+      if (any(blanks)) names(x)[blanks] <- paste0("layer", which(blanks))
+    }
+  }
+  else {
+    stop("x must be either a Raster object or a list of Raster objects")
   }
 
-  if (is.null(spacing)) spacing <- min( raster::res(r) )
+
+  x <- lapply(x, function(r) {
+    if (raster::nlayers(r) > 1) {
+      warning("Only sampling first layer of multi-layer raster")
+      r <- raster::subset(r, 1)
+    }
+    else r
+  })
+
+
+  cellres <- sapply(x, raster::res)
+  if (is.null(spacing)) spacing <- min(cellres)
+
 
   # Generate sample points. This will give an sfc object
   # containing MULTIPOINTS, one for each scan line
-  mpts <- sf::st_line_sample(lines, density = 1 / spacing)
+  mpts <- st_line_sample(lines, density = 1 / spacing)
 
 
+  # Create an sf object of sample points
   dat <- lapply(1:nrow(lines),
                 function(i) {
                   mp <- mpts[[i]]
 
-                  p <- sf::st_cast( sf::st_geometry(mp), "POINT" )
-
-                  x <- raster::extract(r, as(p, "Spatial"))
+                  # convert multi-points to a list ('sfc' object) of
+                  # simple points
+                  p <- st_cast( st_geometry(mp), "POINT" )
 
                   st_sf(locationid = lines$locationid[i],
                         lineid = lines$lineid[i],
-                        sampleid = 1:length(x),
-                        value = x,
-                        geometry = st_sfc(p))
+                        sampleid = 1:length(p),
+                        geometry = p)
                 })
 
-  do.call(rbind, dat)
+  dat <- do.call(rbind, dat)
+
+
+  # Extract values from rasters
+  mxy <- st_coordinates(dat$geometry)
+  vals <- lapply(x, function(r) {
+    raster::extract(r, mxy)
+  })
+  names(vals) <- names(x)
+
+  # Return result. Note: we don't use cbind here because it doesn't
+  # work well with the sf object
+  st_sf( data.frame(dat, vals) )
 }
 

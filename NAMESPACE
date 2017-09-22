@@ -2,6 +2,11 @@
 
 export(make_scan_lines)
 export(sample_raster)
+importFrom(sf,st_bind_cols)
+importFrom(sf,st_cast)
+importFrom(sf,st_coordinates)
+importFrom(sf,st_geometry)
+importFrom(sf,st_line_sample)
 importFrom(sf,st_linestring)
 importFrom(sf,st_sf)
 importFrom(sf,st_sfc)

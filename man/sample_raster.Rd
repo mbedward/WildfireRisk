@@ -2,12 +2,14 @@
 % Please edit documentation in R/line_functions.R
 \name{sample_raster}
 \alias{sample_raster}
-\title{Sample a raster layer at points along scan lines}
+\title{Sample one or more raster layers at points along scan lines}
 \usage{
-sample_raster(r, lines, spacing = NULL)
+sample_raster(x, lines, spacing = NULL)
 }
 \arguments{
-\item{r}{The raster layer to be sampled.}
+\item{x}{Either a single Raster object or a list of Raster objects to sample.
+If a named list, the names will be used as the column names for sample values
+in the returned data frame.}
 
 \item{lines}{An \code{sf} object containing scan lines for point locations.}
 
@@ -15,22 +17,23 @@ sample_raster(r, lines, spacing = NULL)
 (the default), this will be set to half the cell width of the raster layer.}
 }
 \value{
-An \code{sf} object with columns locationid, lineid (both taken from the input
-  \code{lines} object), sampleid, value and geometry (sample point).
+An \code{sf} object with columns: locationid, lineid (both taken from the input
+  \code{lines} object), sampleid, geometry (sample point) and a column of
+  sample values for each of the input rasters.
 }
 \description{
-This function takes a raster layer and a samples cell values at regularly
+This function takes one or more raster layers and samples cell values at regularly
 spaced points along a given set of scan lines. The scan lines are provided
 as an \code{sf} object as produced by \code{\link{make_scan_lines}}.
 }
 \note{
-If the raster object has multiple layers (ie. a RasterStack or RasterBrick
+If a raster object has multiple layers (ie. a RasterStack or RasterBrick
   object) a warning will be issued and only the first layer will be sampled.
 }
 \examples{
 \dontrun{
 
-# Sample a raster layer of time since fire values
+# First example: sample a single raster layer of time since fire values
 vals <- sample_raster(r.tsf, lines)
 
 # Calculate median time since fire value for the central point
@@ -42,6 +45,11 @@ vals \%>\%
   group_by(locationid) \%>\%
   summarize(tsf = median(value, na.rm = TRUE))
 
+
+# Second example: sample two raster layers for time since fire and
+# presence of forest cover
+rr <- list(r.tsf, r.forest)
+vals <- sample_raster(rr, lines)
 }
 
 }
