@@ -102,31 +102,36 @@ make_scan_lines <- function(locations, nlines, lengths, angles = NULL, crs = NUL
     function(i) {
       x0 <- locations[[i,2]]
       y0 <- locations[[i,3]]
+      
       lengths <- length_fun(nlines)
       angles <- angle_fun(nlines)
       
-      lines <- lapply(1:nlines,
-                      function(k) {
-                        x1 <- x0 + lengths[k] * cos(angles[k])
-                        y1 <- y0 + lengths[k] * sin(angles[k])
-                        st_linestring(matrix(c(x0, x1, y0, y1), ncol = 2))
-                      })
-      
-      st_sf(locationid = locations[[i, 1]], lineid = 1:nlines, geometry = st_sfc(lines))
+      lapply(1:nlines,
+             function(k) {
+               x1 <- x0 + lengths[k] * cos(angles[k])
+               y1 <- y0 + lengths[k] * sin(angles[k])
+               st_linestring(matrix(c(x0, x1, y0, y1), ncol = 2))
+             })
     })
+
+  # flatten the list of lists of LINESTRINGS
+  lines <- unlist(lines, recursive = FALSE)
   
-  lines <- do.call(rbind, lines)
+  dat <- st_sf(locationid = rep(locations[[1]], each = nlines),
+               lineid = rep(1:nlines, nrow(locations)),
+               geometry = st_sfc(lines),
+               stringsAsFactors = FALSE)
   
   if (!is.null(crs)) {
     if (is.integer(crs) | is.character(crs))
-      st_crs(lines) <- crs[1]
+      st_crs(dat) <- crs[1]
     else if (inherits(crs, "Raster"))
-      st_crs(lines) <- raster::crs(crs, asText = TRUE)
+      st_crs(dat) <- raster::crs(crs, asText = TRUE)
     else if (inherits(crs, "sf"))
-      st_crs(lines) <- st_crs(crs)
+      st_crs(dat) <- st_crs(crs)
   }
   
-  lines
+  dat
 }
 
 
@@ -219,35 +224,33 @@ sample_raster <- function(x, lines, spacing = NULL) {
   # containing MULTIPOINTS, one for each scan line
   mpts <- st_line_sample(lines, density = 1 / spacing)
 
-
-  # Create an sf object of sample points
+  # Create a data frame of sample points
   dat <- lapply(1:nrow(lines),
                 function(i) {
-                  mp <- mpts[[i]]
+                  xy <- st_coordinates(mpts[[i]])
 
-                  # convert multi-points to a list ('sfc' object) of
-                  # simple points
-                  p <- st_cast( st_geometry(mp), "POINT" )
-
-                  st_sf(locationid = lines$locationid[i],
+                  data.frame(locationid = lines$locationid[i],
                         lineid = lines$lineid[i],
-                        sampleid = 1:length(p),
-                        geometry = p)
+                        sampleid = 1:nrow(xy),
+                        x = xy[, 1], 
+                        y = xy[, 2])
                 })
 
   dat <- do.call(rbind, dat)
 
 
   # Extract values from rasters
-  mxy <- st_coordinates(dat$geometry)
   vals <- lapply(x, function(r) {
-    raster::extract(r, mxy)
+    raster::extract(r, as.matrix(dat[, c("x", "y")]))
   })
   names(vals) <- names(x)
 
   # Return result. Note: we don't use cbind here because it doesn't
   # work well with the sf object
-  st_sf( data.frame(dat, vals) )
+  dat <- st_as_sf( data.frame(dat, vals), coords = c("x", "y") )
+  st_crs(dat) <- st_crs(lines)
+  
+  dat
 }
 
 
