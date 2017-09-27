@@ -4,19 +4,16 @@
 \alias{make_scan_lines}
 \title{Generate radial scan lines from one or more locations}
 \usage{
-make_scan_lines(nlines, locations, lengths, angles = NULL)
+make_scan_lines(locations, nlines, lengths, angles = NULL, crs = NULL)
 }
 \arguments{
-\item{nlines}{Number of lines to generate for each point.}
+\item{locations}{A matrix or data frame with either two columns for X-Y
+coordinates; or three columns for location identifier (alpha-numeric)
+then X-Y coordinates in that order. If location identifiers are not
+provided, these will be set as consecutive integers in the returned
+scan lines.}
 
-\item{locations}{One or more locations represented by one of:
-\itemize{
-  \item{A vector of X and Y values for a single location;}
-  \item{A two-column matrix or data.frame of X and Y values (in that order).}
-  \item{An sf object with POINT or MULTIPOINT features. In this case the
-    map projection of the input data (if defined) will be set for the output
-    scan lines.}
-}}
+\item{nlines}{Number of lines to generate for each point.}
 
 \item{lengths}{Either a single value for uniform line length; or a
 vector of \code{n} line lengths; or a function that returns a vector
@@ -25,6 +22,11 @@ of lengths.}
 \item{angles}{Either a vector of line directions (degrees); or a
 function that returns a vector of directions; or \code{NULL}
 for uniform distribution of line angles.}
+
+\item{crs}{An optional specifier for the coordinate reference system of
+the scan lines. This can either be an integer EPSG code, a character
+string in proj4 format, or a spatial object from which a map projection
+can be taken (e.g. a Raster object or an 'sf' spatial data frame).}
 }
 \value{
 An \code{sf} object (data frame) with columns locationid (integer),
@@ -39,15 +41,22 @@ individually specified; or set by a user-provided function.
 }
 \examples{
 # Some random point locations in a 20x20km area
-Npts <- 100
+Npts <- 10
 pts <- matrix(runif(2*Npts, 0, 20000), ncol = 2)
+
+# Add identifying labels for locations
+pts <- data.frame(id = LETTERS[1:Npts], pts)
+colnames(pts)[2:3] <- c("x", "y")
 
 # Generate 80 lines of uniform length 5km from each point.
 # Line angles default to regular increments.
-lines <- make_scan_lines(80, pts, lengths = 5000)
+# Set the coordinate reference system to MGA Zone 55
+# using its EPSG code 28355
+#
+lines <- make_scan_lines(80, pts, lengths = 5000, crs = 28355)
 
 # Variable line lengths from an exponential distribution
-# with mean length 5km (95\% bounds: 125m - 18.4km)
+# with mean length 5km (95\% bounds: 125m - 18.4km).
 fun <- function(n) rexp(n, 1 / 5000)
 lines <- make_scan_lines(80, pts, lengths = fun)
 

@@ -6,16 +6,13 @@
 #' particular distribution). Line angles can be regularly spaced (the default);
 #' individually specified; or set by a user-provided function.
 #'
-#' @param nlines Number of lines to generate for each point.
+#' @param locations A matrix or data frame with either two columns for X-Y
+#'   coordinates; or three columns for location identifier (alpha-numeric)
+#'   then X-Y coordinates in that order. If location identifiers are not
+#'   provided, these will be set as consecutive integers in the returned
+#'   scan lines.
 #'
-#' @param locations One or more locations represented by one of:
-#'   \itemize{
-#'     \item{A vector of X and Y values for a single location;}
-#'     \item{A two-column matrix or data.frame of X and Y values (in that order).}
-#'     \item{An sf object with POINT or MULTIPOINT features. In this case the
-#'       map projection of the input data (if defined) will be set for the output
-#'       scan lines.}
-#'   }
+#' @param nlines Number of lines to generate for each point.
 #'
 #' @param lengths Either a single value for uniform line length; or a
 #'   vector of \code{n} line lengths; or a function that returns a vector
@@ -25,44 +22,52 @@
 #'   function that returns a vector of directions; or \code{NULL}
 #'   for uniform distribution of line angles.
 #'
+#' @param crs An optional specifier for the coordinate reference system of
+#'   the scan lines. This can either be an integer EPSG code, a character
+#'   string in proj4 format, or a spatial object from which a map projection
+#'   can be taken (e.g. a Raster object or an 'sf' spatial data frame).
+#'
 #' @return An \code{sf} object (data frame) with columns locationid (integer),
 #'   lineid (integer) and geometry (LINESTRING).
 #'
 #' @examples
 #' # Some random point locations in a 20x20km area
-#' Npts <- 100
+#' Npts <- 10
 #' pts <- matrix(runif(2*Npts, 0, 20000), ncol = 2)
+#'
+#' # Add identifying labels for locations
+#' pts <- data.frame(id = LETTERS[1:Npts], pts)
+#' colnames(pts)[2:3] <- c("x", "y")
 #'
 #' # Generate 80 lines of uniform length 5km from each point.
 #' # Line angles default to regular increments.
-#' lines <- make_scan_lines(80, pts, lengths = 5000)
+#' # Set the coordinate reference system to MGA Zone 55
+#' # using its EPSG code 28355
+#' #
+#' lines <- make_scan_lines(80, pts, lengths = 5000, crs = 28355)
 #'
 #' # Variable line lengths from an exponential distribution
-#' # with mean length 5km (95% bounds: 125m - 18.4km)
+#' # with mean length 5km (95% bounds: 125m - 18.4km).
 #' fun <- function(n) rexp(n, 1 / 5000)
 #' lines <- make_scan_lines(80, pts, lengths = fun)
 #'
-#' @importFrom sf st_sf st_sfc st_linestring
-#'
 #' @export
 #'
-make_scan_lines <- function(nlines, locations, lengths, angles = NULL) {
-
-  if (inherits(locations, "sf")) {
-    stop("TODO - add support for sf object")
+make_scan_lines <- function(locations, nlines, lengths, angles = NULL, crs = NULL) {
+  
+  if (ncol(locations) < 2) stop("Argument locations must have at least 2 columns")
+  
+  if (is.matrix(locations))
+    locations <- as.data.frame(locations)
+  
+  if (ncol(locations) == 2) {
+    # X-Y columns only
+    locations <- data.frame(locationid = 1:nrow(locations), locations)
   }
-  else if (is.data.frame(locations))
-    centres <- as.matrix(locations[, 1:2])
-  else if (is.matrix(locations))
-    centres <- locations
-  else if (is.vector(locations))
-    centres <- matrix(locations[1:2], ncol = 2)
-
-  if (!is.matrix(centres)) {
-    stop("Unexpected type of object for argument locations: ", class(locations))
-  }
-
-
+  
+  # Ensure identifiers are treated as alpha-numeric
+  locations[[1]] <- as.character(locations[[1]])
+  
   if (is.vector(lengths)) {
     lengths <- .fixed_length_vector(lengths, nlines)
     length_fun <- function(...) lengths
@@ -73,8 +78,8 @@ make_scan_lines <- function(nlines, locations, lengths, angles = NULL) {
   } else {
     stop("Argument lengths should be a single value, vector or function")
   }
-
-
+  
+  
   if (is.null(angles)) {
     angles <- seq(0, 2*pi, length.out = nlines+1)[-1]
     angle_fun <- function(...) angles
@@ -89,29 +94,41 @@ make_scan_lines <- function(nlines, locations, lengths, angles = NULL) {
   } else {
     stop("Argument angles should be a single value, vector or function")
   }
-
-
+  
+  
   lines <- lapply(
-    1:nrow(centres),
-
+    1:nrow(locations),
+    
     function(i) {
-      x0 <- centres[i,1]
-      y0 <- centres[i,2]
+      x0 <- locations[[i,2]]
+      y0 <- locations[[i,3]]
       lengths <- length_fun(nlines)
       angles <- angle_fun(nlines)
-
+      
       lines <- lapply(1:nlines,
-                    function(k) {
-                      x1 <- x0 + lengths[k] * cos(angles[k])
-                      y1 <- y0 + lengths[k] * sin(angles[k])
-                      st_linestring(matrix(c(x0, x1, y0, y1), ncol = 2))
-                    })
-
-      st_sf(locationid = i, lineid = 1:nlines, geometry = st_sfc(lines))
+                      function(k) {
+                        x1 <- x0 + lengths[k] * cos(angles[k])
+                        y1 <- y0 + lengths[k] * sin(angles[k])
+                        st_linestring(matrix(c(x0, x1, y0, y1), ncol = 2))
+                      })
+      
+      st_sf(locationid = locations[[i, 1]], lineid = 1:nlines, geometry = st_sfc(lines))
     })
-
-  do.call(rbind, lines)
+  
+  lines <- do.call(rbind, lines)
+  
+  if (!is.null(crs)) {
+    if (is.integer(crs) | is.character(crs))
+      st_crs(lines) <- crs[1]
+    else if (inherits(crs, "Raster"))
+      st_crs(lines) <- raster::crs(crs, asText = TRUE)
+    else if (inherits(crs, "sf"))
+      st_crs(lines) <- st_crs(crs)
+  }
+  
+  lines
 }
+
 
 
 
@@ -158,8 +175,6 @@ make_scan_lines <- function(nlines, locations, lengths, angles = NULL) {
 #' rr <- list(r.tsf, r.forest)
 #' vals <- sample_raster(rr, lines)
 #' }
-#'
-#' @importFrom sf st_bind_cols st_cast st_coordinates st_geometry st_sf st_line_sample
 #'
 #' @export
 #'
@@ -233,5 +248,68 @@ sample_raster <- function(x, lines, spacing = NULL) {
   # Return result. Note: we don't use cbind here because it doesn't
   # work well with the sf object
   st_sf( data.frame(dat, vals) )
+}
+
+
+
+#' Calculates line compass bearings
+#'
+#' Given one or more lines, this function calculates the compass bearing (in
+#' degrees) from the start point to the end point of each.
+#'
+#' @param lines Either a single \code{"LINESTRING"} object or a list of one or more
+#'   objects. If the latter, the list can be a geometry column object (class \code{"sfc"})
+#'   from an \code{sf} spatial data frame.
+#'
+#' @return Compass bearings of lines as a numeric vector.
+#'
+#' @seealso \code{\link[sf]{sfc}}
+#'
+#' @export
+#'
+line_bearing <- function(lines) {
+  if (inherits(lines, "LINESTRING")) {
+    lines <- list(lines)
+  }
+  else if (inherits(lines, "sfc_LINESTRING")) {
+    # no pre-processing required
+  }
+  else if (is.list(lines)) {
+    ok <- all(sapply(X = lines, FUN = inherits, "LINESTRING"))
+    if (!ok) stop("All objects in the input list should be class LINESTRING")
+  }
+  else
+    stop("Argument lines should be a LINESTRING (sf geometry) object or a list of LINESTRINGs")
+
+
+  sapply(lines, function(line) {
+    xy <- sf::st_coordinates(line)
+    n <- nrow(xy)
+
+    # cartesian angle in degrees
+    angle <- 180 * atan2(xy[n, 2] - xy[1, 2], xy[n, 1] - xy[1, 1]) / pi
+
+    # compass bearing
+    unname( (450 - angle) %% 360 )
+  })
+}
+
+
+#' Tests lines for westerly orientation
+#'
+#' Given one or more lines, this function checks if the compass bearing from the start
+#' to the end point of each lies within the range for westerly orientation.
+#'
+#' @param lines Either a single \code{"LINESTRING"} object or a list of one or more
+#'   objects. If the latter, the list can be a geometry column object (class \code{"sfc"})
+#'   from an \code{sf} spatial data frame.
+#'
+#' @return A logical vector where \code{TRUE} indicates westerly orientation.
+#'
+#' @export
+#'
+is_line_west <- function(lines, compass.limits = c(247.5, 292.5)) {
+  bearings <- line_bearing(lines)
+  bearings >= compass.limits[1] & bearings <= compass.limits[2]
 }
 
