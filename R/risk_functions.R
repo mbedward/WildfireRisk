@@ -102,3 +102,56 @@ calculate_risk <- function(lines,
   dat
 }
 
+
+#' Summarize scan line risk values
+#'
+#' This function takes an \code{sf} data frame of risk values for scan lines,
+#' as returned by \code{calculate_risk}, and summarizes the probability values
+#' over the set of lines for each location by: mean; median; lower quartile and
+#' upper quartile.
+#'
+#' @param risk An \code{sf} data frame of risk values for scan lines as
+#'   returned by \code{calculate_risk}.
+#'
+#' @return An \code{sf} data frame of summary risk statistics for each location.
+#'
+#' @seealso \code{\link{calculate_risk}}
+#'
+#' @importFrom dplyr do group_by
+#'
+#' @export
+#'
+summarize_risk <- function(risk) {
+  firstpoint <- function(lines) {
+    m <- st_coordinates(lines)
+    data.frame(x = m[1,1], y = m[1,2])
+  }
+
+  loc <- risk %>%
+    group_by(locationid) %>%
+    do(firstpoint(.$geometry))
+
+  pstats <- risk %>%
+    # drop scan lines
+    as.data.frame() %>%
+
+    # calculate mean probabilities
+    group_by(locationid) %>%
+
+    summarize(pfire_mean = mean(pfire, na.rm = TRUE),
+              pfire_mid = median(pfire, na.rm = TRUE),
+              pfire_25 = quantile(pfire, 0.25, na.rm = TRUE),
+              pfire_75 = quantile(pfire, 0.75, na.rm = TRUE) ) %>%
+
+    # join location data
+    left_join(loc, by = "locationid") %>%
+
+    # convert to a spatial (sf) object with point geometry
+    st_as_sf(coords = c("x", "y"))
+
+
+  # Set coordinate reference system via the EPSG code for Zone 55
+  st_crs(pstats) <- st_crs(risk)
+
+  pstats
+}
