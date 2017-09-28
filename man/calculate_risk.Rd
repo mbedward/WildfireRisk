@@ -5,7 +5,7 @@
 \title{Calculate risk of wildfire at given locations}
 \usage{
 calculate_risk(lines, tsf, forest, sample.spacing, ffdi = 50, kbdi = 100,
-  as.sf = TRUE)
+  tsfmax = 50, as.sf = TRUE)
 }
 \arguments{
 \item{lines}{An \code{sf} object (spatial data frame) with scan lines
@@ -22,6 +22,9 @@ non-forest cells and all other values indicate forest cells.}
 
 \item{kbdi}{Constant KBDI value to use for calculations (default = 100).}
 
+\item{tsfmax}{High value of time since fire to use for calculation of risk
+if all scan lines are long unburnt (default = 50).}
+
 \item{as.sf}{If \code{TRUE} (default), the returned data frame will be an
 \code{sf} object where the geometry column has the input scan lines.
 If \code{FALSE}, the returned object is a simple data frame with no
@@ -29,13 +32,17 @@ geometry column.}
 }
 \value{
 A data frame giving, for each location and scan line, the
-  variables used for the risk calculation and the predicted probability.
+  variables used for the risk calculation and the predicted probabilities
+  for both observed and long-unburnt time since fire (columns 'pobs' and 'pmax').
 }
 \description{
 This function takes a data frame of scan lines created with \code{make_scan_lines}
 and samples time since fire and forest cover values along each line. It then uses
 these values to calculate the probability of wildfire travelling along each line.
 The calculation is based on the regression equation of Price \emph{et al.} 2015.
+The function then calculates a second probability, for comparison, with the time
+since fire value for each line set to \code{tsf.max} (a high value representing
+long unburnt).
 }
 \details{
 If the input scan lines have a coordinate reference system, and argument \code{as.sf}
