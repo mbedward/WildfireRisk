@@ -4,11 +4,15 @@
 \alias{summarize_risk}
 \title{Summarize scan line risk values}
 \usage{
-summarize_risk(risk)
+summarize_risk(risk, quantiles = c(0.25, 0.75))
 }
 \arguments{
 \item{risk}{An \code{sf} data frame of risk values for scan lines as
 returned by \code{calculate_risk}.}
+
+\item{quantiles}{A vector of quantiles (probabilities with values in [0,1])
+to calculate in addition to the mean. If \code{NULL} or an empty vector
+no quantiles are calculated.}
 }
 \value{
 An \code{sf} data frame of summary risk statistics for each location.
@@ -16,8 +20,21 @@ An \code{sf} data frame of summary risk statistics for each location.
 \description{
 This function takes an \code{sf} data frame of risk values for scan lines,
 as returned by \code{calculate_risk}, and summarizes the probability values
-over the set of lines for each location by: mean; median; lower quartile and
-upper quartile.
+over the set of lines for each location by mean and (optionally) quantiles.
+}
+\details{
+Scan line risk values are probabilities in the strict sense. In constrast,
+the summary statistics for locations derived by this function, such as the
+mean of scan line probabilities are not probabilities despite being
+restricted to the unit inteval.
+}
+\examples{
+\dontrun{
+risk.lines <- calculate_risk(scanlines, tsf, forest, 100)
+
+risk.locations <- summarize_risk(risk.lines, quantiles = c(0.1, 0.9))
+}
+
 }
 \seealso{
 \code{\link{calculate_risk}}

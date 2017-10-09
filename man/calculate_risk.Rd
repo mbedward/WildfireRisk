@@ -5,7 +5,7 @@
 \title{Calculate risk of wildfire at given locations}
 \usage{
 calculate_risk(lines, tsf, forest, sample.spacing, ffdi = 50, kbdi = 100,
-  tsfmax = 50, as.sf = TRUE)
+  tsfmax = 50)
 }
 \arguments{
 \item{lines}{An \code{sf} object (spatial data frame) with scan lines
@@ -24,11 +24,6 @@ non-forest cells and all other values indicate forest cells.}
 
 \item{tsfmax}{High value of time since fire to use for calculation of risk
 if all scan lines are long unburnt (default = 50).}
-
-\item{as.sf}{If \code{TRUE} (default), the returned data frame will be an
-\code{sf} object where the geometry column has the input scan lines.
-If \code{FALSE}, the returned object is a simple data frame with no
-geometry column.}
 }
 \value{
 A data frame giving, for each location and scan line, the
@@ -45,9 +40,11 @@ since fire value for each line set to \code{tsf.max} (a high value representing
 long unburnt).
 }
 \details{
-If the input scan lines have a coordinate reference system, and argument \code{as.sf}
-is \code{TRUE} (default), then the same CRS will be set for the output. However,
-note that this function does not check that the scan lines and raster layers are in
-compatible projections, or that the value for sample.spacing is sensible for
-the map units being used. This is up to you!
+If the input scan lines have a coordinate reference system defined, it will be set
+for the output.
+}
+\note{
+This function does not check that the scan lines and raster layers are in
+compatible projections, or that the value for sample.spacing is sensible for the
+map units being used.
 }

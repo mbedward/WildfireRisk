@@ -27,3 +27,22 @@
     stop("Function ", fname, " takes ", nf, " arguments but should take ", n)
   }
 }
+
+
+# Retrieve an 'sf' object of vector data.
+# If obj is an 'sf' object, just return it;
+# if it is a string, treat it as the path to a file to read.
+#
+.get_sf_object <- function(obj) {
+  if (is.character(obj))
+    obj <- st_read(obj[1], quiet = TRUE)
+
+  if (!inherits(obj, "sf")) {
+    objname <- deparse(substitute(obj))
+    stop("Argument ", objname, " must be either an sf object\n",
+         "  or the path to a file of vector data to read")
+  }
+
+  obj
+}
+

@@ -54,20 +54,20 @@
 #' @export
 #'
 make_scan_lines <- function(locations, nlines, lengths, angles = NULL, crs = NULL) {
-  
+
   if (ncol(locations) < 2) stop("Argument locations must have at least 2 columns")
-  
+
   if (is.matrix(locations))
     locations <- as.data.frame(locations)
-  
+
   if (ncol(locations) == 2) {
     # X-Y columns only
     locations <- data.frame(locationid = 1:nrow(locations), locations)
   }
-  
+
   # Ensure identifiers are treated as alpha-numeric
   locations[[1]] <- as.character(locations[[1]])
-  
+
   if (is.vector(lengths)) {
     lengths <- .fixed_length_vector(lengths, nlines)
     length_fun <- function(...) lengths
@@ -78,8 +78,8 @@ make_scan_lines <- function(locations, nlines, lengths, angles = NULL, crs = NUL
   } else {
     stop("Argument lengths should be a single value, vector or function")
   }
-  
-  
+
+
   if (is.null(angles)) {
     angles <- seq(0, 2*pi, length.out = nlines+1)[-1]
     angle_fun <- function(...) angles
@@ -94,18 +94,18 @@ make_scan_lines <- function(locations, nlines, lengths, angles = NULL, crs = NUL
   } else {
     stop("Argument angles should be a single value, vector or function")
   }
-  
-  
+
+
   lines <- lapply(
     1:nrow(locations),
-    
+
     function(i) {
       x0 <- locations[[i,2]]
       y0 <- locations[[i,3]]
-      
+
       lengths <- length_fun(nlines)
       angles <- angle_fun(nlines)
-      
+
       lapply(1:nlines,
              function(k) {
                x1 <- x0 + lengths[k] * cos(angles[k])
@@ -116,12 +116,12 @@ make_scan_lines <- function(locations, nlines, lengths, angles = NULL, crs = NUL
 
   # flatten the list of lists of LINESTRINGS
   lines <- unlist(lines, recursive = FALSE)
-  
+
   dat <- st_sf(locationid = rep(locations[[1]], each = nlines),
                lineid = rep(1:nlines, nrow(locations)),
                geometry = st_sfc(lines),
                stringsAsFactors = FALSE)
-  
+
   if (!is.null(crs)) {
     if (is.integer(crs) | is.character(crs))
       st_crs(dat) <- crs[1]
@@ -130,7 +130,7 @@ make_scan_lines <- function(locations, nlines, lengths, angles = NULL, crs = NUL
     else if (inherits(crs, "sf"))
       st_crs(dat) <- st_crs(crs)
   }
-  
+
   dat
 }
 
@@ -232,7 +232,7 @@ sample_raster <- function(x, lines, spacing = NULL) {
                   data.frame(locationid = lines$locationid[i],
                         lineid = lines$lineid[i],
                         sampleid = 1:nrow(xy),
-                        x = xy[, 1], 
+                        x = xy[, 1],
                         y = xy[, 2])
                 })
 
@@ -249,7 +249,7 @@ sample_raster <- function(x, lines, spacing = NULL) {
   # work well with the sf object
   dat <- st_as_sf( data.frame(dat, vals), coords = c("x", "y") )
   st_crs(dat) <- st_crs(lines)
-  
+
   dat
 }
 
@@ -315,4 +315,76 @@ is_line_west <- function(lines, compass.limits = c(247.5, 292.5)) {
   bearings <- line_bearing(lines)
   bearings >= compass.limits[1] & bearings <= compass.limits[2]
 }
+
+
+
+#' Identify scan lines that intersect polygons
+#'
+#' Given a set of \emph{N} polygons (e.g. representing management units), this
+#' function returns a list of \emph{N} elements with each element a vector of
+#' integer row indices of the scan lines in the \code{lines} object that
+#' the polygon intersects. A polygon that does not intersect any scan lines
+#' will have a zero-length vector in the list.
+#'
+#' @param blocks Polygons (or multi-polygons). These can be provided
+#'   as an \code{sf} data frame or as the path to a file of vector data
+#'   (e.g. ESRI shapefile).
+#'
+#' @param lines Scan lines as an \code{sf} object; e.g. as returned by
+#'   function \code{make_scan_lines} or \code{calculate_risk}.
+#'
+#' @param strict.crs If TRUE, the blocks and lines objects must have
+#'   exactly the same coordinate reference system (CRS) defined. If FALSE,
+#'   the function will allow any of the following:
+#'   no CRS defined for either object (the function will assume coordinates
+#'   can be validly compared between objects);
+#'   or CRS defined for only one object (the function will assume it also
+#'   applies to the other object);
+#'   or a different CRS for each object (the function will transform
+#'   block data to have the same CRS as line data).
+#'
+#' @param quiet If TRUE, suppress messages and warnings about coordinate
+#'   reference systems of objects.
+#'
+#' @seealso \code{\link{profile_blocks}}
+#'
+#' @export
+#"
+lines_in_blocks <- function(blocks, lines, strict.crs = FALSE, quiet = FALSE) {
+  blocks <- .get_polygons(blocks)
+
+  bcrs <- st_crs(blocks)
+  has.bcrs <- !is.na(bcrs)
+
+  lcrs <- st_crs(lines)
+  has.lcrs <- !is.na(lcrs)
+
+  any.crs <- has.bcrs || has.lcrs
+
+  same.crs <- has.bcrs && has.lcrs && bcrs == lcrs
+
+  if (!same.crs) {
+    if (strict.crs) {
+      stop("blocks and lines do not have the same coordinate reference system")
+    }
+    else if (has.lcrs && has.bcrs) {
+      # Both objects have a CRS - use the one for lines
+      if (!quiet) message("Transforming CRS of blocks to that of lines")
+      blocks <- st_transform(blocks, lcrs)
+    }
+    else if (has.lcrs) {
+      # Only lines have CRS
+      if (!quiet) warning("No CRS for blocks. Assuming same CRS as lines")
+      st_crs(blocks) <- st_crs(lines)
+    }
+    else if (has.bcrs) {
+      # Only blocks have CRS
+      if (!quiet) warning("No CRS for lines. Assuming same CRS as blocks")
+      st_crs(lines) <- st_crs(blocks)
+    }
+  }
+
+  st_intersects(blocks, lines)
+}
+
 
