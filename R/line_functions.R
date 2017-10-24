@@ -351,7 +351,7 @@ is_line_west <- function(lines, compass.limits = c(247.5, 292.5)) {
 #' @export
 #"
 lines_in_blocks <- function(blocks, lines, strict.crs = FALSE, quiet = FALSE) {
-  blocks <- .get_polygons(blocks)
+  blocks <- .get_sf_object(blocks)
 
   bcrs <- st_crs(blocks)
   has.bcrs <- !is.na(bcrs)
