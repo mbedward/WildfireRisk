@@ -4,8 +4,8 @@
 \alias{calculate_risk}
 \title{Calculate risk of wildfire at given locations}
 \usage{
-calculate_risk(lines, tsf, forest, sample.spacing, ffdi = 50, kbdi = 100,
-  tsfmax = 50)
+calculate_risk(lines, tsf, forest, sample.spacing, dbname = "pointdata.db",
+  ffdi = 50, kbdi = 100, tsfmax = 50)
 }
 \arguments{
 \item{lines}{An \code{sf} object (spatial data frame) with scan lines
@@ -24,11 +24,18 @@ non-forest cells and all other values indicate forest cells.}
 
 \item{tsfmax}{High value of time since fire to use for calculation of risk
 if all scan lines are long unburnt (default = 50).}
+
+\item{point.db}{The path for the SQLite database file in which to cache
+sample point data for scan lines. If the specified file already exists
+it will be over-written and a warning message issued.}
 }
 \value{
-A data frame giving, for each location and scan line, the
-  variables used for the risk calculation and the predicted probabilities
-  for both observed and long-unburnt time since fire (columns 'pobs' and 'pmax').
+A \code{risk} object (a type of \code{sf} spatial data frame) containing,
+  for each location and scan line, the variables used for the risk calculation
+  and the predicted probabilities for both observed and long-unburnt time since
+  fire (columns 'pobs' and 'pmax'). The path/filename of the associated SQLite
+  database with point data for the scan lines is recorded as the \code{"dbname"}
+  attribute.
 }
 \description{
 This function takes a data frame of scan lines created with \code{make_scan_lines}
@@ -40,11 +47,16 @@ since fire value for each line set to \code{tsf.max} (a high value representing
 long unburnt).
 }
 \details{
-If the input scan lines have a coordinate reference system defined, it will be set
-for the output.
+The coordinates of points along each scan line and corresponding values of
+time since fire and forest cover are cached in a SQLite database for later
+use. The path to this file is recorded as the \code{"dbname"} attribute of the
+returned \code{risk} object. If you rename or move the database (e.g. when
+transferring files to another system) you should manually update the attribute
+with the new full path to the database. For example:
+\code{attr(risk, "dbname") <- "c:/foo/bar/pointdata.db"}.
 }
 \note{
-This function does not check that the scan lines and raster layers are in
-compatible projections, or that the value for sample.spacing is sensible for the
-map units being used.
+This function assumes that scan lines and raster layers are in
+compatible projections with metres as the distance unit. If the input scan lines
+have a coordinate reference system defined, it will be set for the output.
 }

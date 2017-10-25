@@ -4,7 +4,8 @@
 \alias{lines_in_blocks}
 \title{Identify scan lines that intersect polygons}
 \usage{
-lines_in_blocks(blocks, lines, strict.crs = FALSE, quiet = FALSE)
+lines_in_blocks(blocks, lines, by = c("block", "line"), strict.crs = FALSE,
+  quiet = FALSE)
 }
 \arguments{
 \item{blocks}{Polygons (or multi-polygons). These can be provided

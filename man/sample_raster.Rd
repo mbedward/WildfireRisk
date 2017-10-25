@@ -14,12 +14,12 @@ in the returned data frame.}
 \item{lines}{An \code{sf} object containing scan lines for point locations.}
 
 \item{spacing}{Spacing between adjacent sample points. If \code{NULL}
-(the default), this will be set to half the cell width of the raster layer.}
+(the default), this will be set to the smallest cell width of the input rasters.}
 }
 \value{
-An \code{sf} object with columns: locationid, lineid (both taken from the input
-  \code{lines} object), sampleid, geometry (sample point) and a column of
-  sample values for each of the input rasters.
+A data frame with columns: locationid, lineid (both taken from the input
+  \code{lines} object), sampleid, x and y ordinates of points along lines,
+  and a column of sample values for each of the input rasters.
 }
 \description{
 This function takes one or more raster layers and samples cell values at regularly

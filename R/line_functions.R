@@ -65,8 +65,8 @@ make_scan_lines <- function(locations, nlines, lengths, angles = NULL, crs = NUL
     locations <- data.frame(locationid = 1:nrow(locations), locations)
   }
 
-  # Ensure identifiers are treated as alpha-numeric
-  locations[[1]] <- as.character(locations[[1]])
+  # Ensure identifiers are treated as a factor
+  locations[[1]] <- factor(locations[[1]])
 
   if (is.vector(lengths)) {
     lengths <- .fixed_length_vector(lengths, nlines)
@@ -153,11 +153,11 @@ make_scan_lines <- function(locations, nlines, lengths, angles = NULL, crs = NUL
 #' @param lines An \code{sf} object containing scan lines for point locations.
 #'
 #' @param spacing Spacing between adjacent sample points. If \code{NULL}
-#'   (the default), this will be set to half the cell width of the raster layer.
+#'   (the default), this will be set to the smallest cell width of the input rasters.
 #'
-#' @return An \code{sf} object with columns: locationid, lineid (both taken from the input
-#'   \code{lines} object), sampleid, geometry (sample point) and a column of
-#'   sample values for each of the input rasters.
+#' @return A data frame with columns: locationid, lineid (both taken from the input
+#'   \code{lines} object), sampleid, x and y ordinates of points along lines,
+#'   and a column of sample values for each of the input rasters.
 #'
 #' @examples
 #' \dontrun{
@@ -245,12 +245,8 @@ sample_raster <- function(x, lines, spacing = NULL) {
   })
   names(vals) <- names(x)
 
-  # Return result. Note: we don't use cbind here because it doesn't
-  # work well with the sf object
-  dat <- st_as_sf( data.frame(dat, vals), coords = c("x", "y") )
-  st_crs(dat) <- st_crs(lines)
-
-  dat
+  # Return result
+  data.frame(dat, vals)
 }
 
 
@@ -350,7 +346,8 @@ is_line_west <- function(lines, compass.limits = c(247.5, 292.5)) {
 #'
 #' @export
 #"
-lines_in_blocks <- function(blocks, lines, strict.crs = FALSE, quiet = FALSE) {
+lines_in_blocks <- function(blocks, lines, by = c("block", "line"),
+                            strict.crs = FALSE, quiet = FALSE) {
   blocks <- .get_sf_object(blocks)
 
   bcrs <- st_crs(blocks)
@@ -384,7 +381,9 @@ lines_in_blocks <- function(blocks, lines, strict.crs = FALSE, quiet = FALSE) {
     }
   }
 
-  st_intersects(blocks, lines)
+  switch(match.arg(by),
+         block = st_intersects(blocks, lines),
+         line = st_intersects(lines, blocks))
 }
 
 
