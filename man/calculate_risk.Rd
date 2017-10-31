@@ -33,9 +33,9 @@ it will be over-written and a warning message issued.}
 A \code{risk} object (a type of \code{sf} spatial data frame) containing,
   for each location and scan line, the variables used for the risk calculation
   and the predicted probabilities for both observed and long-unburnt time since
-  fire (columns 'pobs' and 'pmax'). The path/filename of the associated SQLite
-  database with point data for the scan lines is recorded as the \code{"dbname"}
-  attribute.
+  fire (columns 'pobs' and 'pmax'). These data are also written to the SQLite
+  database file. The path/filename of the database with point data is recorded
+  as the \code{"dbname"} attribute of the returned object.
 }
 \description{
 This function takes a data frame of scan lines created with \code{make_scan_lines}
@@ -47,13 +47,16 @@ since fire value for each line set to \code{tsf.max} (a high value representing
 long unburnt).
 }
 \details{
-The coordinates of points along each scan line and corresponding values of
-time since fire and forest cover are cached in a SQLite database for later
-use. The path to this file is recorded as the \code{"dbname"} attribute of the
-returned \code{risk} object. If you rename or move the database (e.g. when
-transferring files to another system) you should manually update the attribute
-with the new full path to the database. For example:
-\code{attr(risk, "dbname") <- "c:/foo/bar/pointdata.db"}.
+The coordinates and data for points sampled along each scan line are written
+to a SQLite database into a table named \code{'pointdata'}. Data for scan
+lines, including end-points, location identifiers, values used for the risk
+calculation (e.g. mean time since fire) and risk values are also written to
+the database into a table named \code{'linedata'}. The path to this file is
+recorded as the \code{"dbname"} attribute of the returned \code{risk} object.
+If you rename or move the database (e.g. when transferring files to another
+system) you should manually update the attribute with the new full path to
+the database.
+For example: \code{attr(risk, "dbname") <- "c:/foo/bar/pointdata.db"}.
 }
 \note{
 This function assumes that scan lines and raster layers are in

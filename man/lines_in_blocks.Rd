@@ -2,7 +2,7 @@
 % Please edit documentation in R/line_functions.R
 \name{lines_in_blocks}
 \alias{lines_in_blocks}
-\title{Identify scan lines that intersect polygons}
+\title{Identify scan lines that intersect blocks (polygons)}
 \usage{
 lines_in_blocks(blocks, lines, by = c("block", "line"), strict.crs = FALSE,
   quiet = FALSE)
@@ -14,6 +14,9 @@ as an \code{sf} data frame or as the path to a file of vector data
 
 \item{lines}{Scan lines as an \code{sf} object; e.g. as returned by
 function \code{make_scan_lines} or \code{calculate_risk}.}
+
+\item{by}{Ordering for the list of intersections: either \code{"block"}
+(default) or \code{"line"}.}
 
 \item{strict.crs}{If TRUE, the blocks and lines objects must have
 exactly the same coordinate reference system (CRS) defined. If FALSE,
@@ -28,13 +31,18 @@ block data to have the same CRS as line data).}
 \item{quiet}{If TRUE, suppress messages and warnings about coordinate
 reference systems of objects.}
 }
-\description{
-Given a set of \emph{N} polygons (e.g. representing management units), this
-function returns a list of \emph{N} elements with each element a vector of
-integer row indices of the scan lines in the \code{lines} object that
-the polygon intersects. A polygon that does not intersect any scan lines
-will have a zero-length vector in the list.
+\value{
+A list of intersections ordered by block or scan line as specified
+  with the \code{by} argument.
 }
-\seealso{
-\code{\link{profile_blocks}}
+\description{
+Given a set of blocks (polygons representing landscape units), this
+function returns a list indicating which scan lines intersect which
+blocks. The ordering of the list is specified by setting the \code{by}
+argument. Option \code{by = "block"} gives a list where each element
+corresponds to a block and is a vector of indices of scan lines that
+intersect the block.
+Option \code{by = "line"} gives a list where each element corresponds
+to a scan line and is a vector of indices of blocks that the line
+intersects.
 }

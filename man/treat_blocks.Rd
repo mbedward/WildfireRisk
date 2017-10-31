@@ -4,40 +4,49 @@
 \alias{treat_blocks}
 \title{Simulate prescribed burning of landscape blocks and update risk values}
 \usage{
-treat_blocks(blocks, risk)
+treat_blocks(block.risk, line.risk)
 }
 \arguments{
-\item{blocks}{An \code{sf} object of polygons for which to simulate
-prescribed burning.}
+\item{block.risk}{An \code{sf} object of baseline risk values for blocks as
+returned by \code{summarize_block_risk}.}
 
-\item{risk}{An \code{sf} data frame of scan lines with associated
-baseline risk values as returned by function \code{calculate_risk}.}
+\item{line.risk}{Either a \code{risk} object as returned by \code{calculate_risk}
+or a character string giving the path and filename of a SQLite database
+of risk data.}
 }
 \value{
 A data frame of updated scan line risk values with columns:
   locationid, lineid, ptreat.
 }
 \description{
-This function takes one or more blocks (polygons representing management units)
-and simulates prescribed burning by setting time since fire within
-each block to zero. Data for scan lines passing through the blocks is
-then updated and the risk value (probablity of fire traversing the line)
-recalculated for each line. The line geometries and their prior risk
-values are taken from the \code{risk} object which is an \code{sf}
-data frame as returned by \code{calculate_risk}.
+This function takes one or more blocks (polygons representing management
+units) and simulates prescribed burning by setting the time since fire within
+each block in turn to zero. Data for scan lines passing through the block
+being considered are then updated and risk value (probablity of fire
+traversing the line) recalculated for each line. The line geometries and
+their prior risk values are taken from the \code{risk} object which is an
+\code{sf} data frame as returned by \code{calculate_risk}.
 }
 \details{
 Sample point locations and prior data for each scan line are retrieved
 from a database file specified by the \code{"dbname"} attribute of
 the input \code{risk} object. See \code{calculate_risk} for more details.
 }
+\note{
+At present this function considers each block singly. Later, an option
+  could be added to consider blocks in groups.
+}
 \examples{
 \dontrun{
 # Load a polygon shapefile of prescribed burning blocks
 blocks <- st_read("burnblocks.shp")
 
-# Simulate treatment for three selected blocks
-risk.updated <- treat_blocks(blocks[c(1, 5, 42), ], risk)
+# Calculate baseline risk values for blocks
+block.risk <- summarize_block_risk(line.risk, blocks)
+
+# Simulate burning each block in turn and report updated
+# block statistics
+block.risk.treated <- treat_blocks(block.risk, line.risk)
 }
 
 }

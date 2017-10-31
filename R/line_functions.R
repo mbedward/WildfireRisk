@@ -314,13 +314,18 @@ is_line_west <- function(lines, compass.limits = c(247.5, 292.5)) {
 
 
 
-#' Identify scan lines that intersect polygons
+#' Identify scan lines that intersect blocks (polygons)
 #'
-#' Given a set of \emph{N} polygons (e.g. representing management units), this
-#' function returns a list of \emph{N} elements with each element a vector of
-#' integer row indices of the scan lines in the \code{lines} object that
-#' the polygon intersects. A polygon that does not intersect any scan lines
-#' will have a zero-length vector in the list.
+#' Given a set of blocks (polygons representing landscape units), this
+#' function returns a list indicating which scan lines intersect which
+#' blocks. The ordering of the list is specified by setting the \code{by}
+#' argument. Option \code{by = "block"} gives a list where each element
+#' corresponds to a block and is a vector of indices of scan lines that
+#' intersect the block.
+#' Option \code{by = "line"} gives a list where each element corresponds
+#' to a scan line and is a vector of indices of blocks that the line
+#' intersects.
+#'
 #'
 #' @param blocks Polygons (or multi-polygons). These can be provided
 #'   as an \code{sf} data frame or as the path to a file of vector data
@@ -328,6 +333,9 @@ is_line_west <- function(lines, compass.limits = c(247.5, 292.5)) {
 #'
 #' @param lines Scan lines as an \code{sf} object; e.g. as returned by
 #'   function \code{make_scan_lines} or \code{calculate_risk}.
+#'
+#' @param by Ordering for the list of intersections: either \code{"block"}
+#'   (default) or \code{"line"}.
 #'
 #' @param strict.crs If TRUE, the blocks and lines objects must have
 #'   exactly the same coordinate reference system (CRS) defined. If FALSE,
@@ -342,7 +350,8 @@ is_line_west <- function(lines, compass.limits = c(247.5, 292.5)) {
 #' @param quiet If TRUE, suppress messages and warnings about coordinate
 #'   reference systems of objects.
 #'
-#' @seealso \code{\link{profile_blocks}}
+#' @return A list of intersections ordered by block or scan line as specified
+#'   with the \code{by} argument.
 #'
 #' @export
 #"
