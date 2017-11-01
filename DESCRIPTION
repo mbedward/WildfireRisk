@@ -6,8 +6,8 @@ Description: This package implements the wildfire risk mapping method of Price e
   risk to landscape variables; and a set of raster layers for those variables; the
   package provides functions to scan the neighbourhood of each location and apply
   the given model to estimate the point risk.
-Version: 0.1.13
-Date: 2017-10-31
+Version: 0.1.14
+Date: 2017-11-01
 Authors@R: c(
   person("Owen", "Price", role = c("aut", "cre"), email = "oprice@uow.edu.au"),
   person("Michael", "Bedward", role = c("aut"), email = "michael.bedward@gmail.com")
@@ -17,6 +17,7 @@ Depends: R (>= 3.4.0),
   sf(>= 0.5-1)
 Imports: 
   dplyr (>= 0.7.2),
+  dbplyr (>= 1.1.0),
   RSQLite (>= 2.0),
   stringr (>= 1.2.0)
 License: BSD

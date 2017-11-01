@@ -4,7 +4,7 @@
 \alias{treat_blocks}
 \title{Simulate prescribed burning of landscape blocks and update risk values}
 \usage{
-treat_blocks(block.risk, line.risk)
+treat_blocks(block.risk, line.risk, in.memory = FALSE)
 }
 \arguments{
 \item{block.risk}{An \code{sf} object of baseline risk values for blocks as
@@ -13,6 +13,14 @@ returned by \code{summarize_block_risk}.}
 \item{line.risk}{Either a \code{risk} object as returned by \code{calculate_risk}
 or a character string giving the path and filename of a SQLite database
 of risk data.}
+
+\item{in.memory}{If \code{TRUE} the function attempts to load all sample point
+data into memory to speed calculations. If \code{FALSE} (default) point data
+is retrieved from the database in batches. Loading all data into memory
+can reduce the total calculation time by half but relies on the host system
+having sufficient RAM. Loaded data for a single point occupies 48 bytes. The
+function \code{pointdata_memory} estimates the total size of the point data
+table when loaded.}
 }
 \value{
 A data frame of updated scan line risk values with columns:
@@ -49,4 +57,7 @@ block.risk <- summarize_block_risk(line.risk, blocks)
 block.risk.treated <- treat_blocks(block.risk, line.risk)
 }
 
+}
+\seealso{
+\code{\link{pointdata_memory}}
 }

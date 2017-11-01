@@ -138,7 +138,7 @@ calculate_risk <- function(lines,
       pdat <- sample_raster(layers, ., sample.spacing)
       if (first.write) {
         dbWriteTable(con, "pointdata", pdat)
-        dbExecute(con, "CREATE INDEX index_pointloc ON pointdata (locationid)")
+        dbExecute(con, "CREATE INDEX index_pointloc ON pointdata (locationid, lineid)")
 
         first.write <- FALSE
       } else {
@@ -442,12 +442,16 @@ summarize_block_risk <- function(line.risk, blocks, quantiles = c(0.25, 0.75),
 #' @param block.risk An \code{sf} object of baseline risk values for blocks as
 #'   returned by \code{summarize_block_risk}.
 #'
+#' @param in.memory If \code{TRUE} the function attempts to load all sample point
+#'   data into memory to speed calculations. If \code{FALSE} (default) point data
+#'   is retrieved from the database in batches. Loading all data into memory
+#'   can reduce the total calculation time by half but relies on the host system
+#'   having sufficient RAM. Loaded data for a single point occupies 48 bytes. The
+#'   function \code{pointdata_memory} estimates the total size of the point data
+#'   table when loaded.
+#'
 #' @return A data frame of updated scan line risk values with columns:
 #'   locationid, lineid, ptreat.
-#'
-#' @importFrom dplyr %>% group_by summarize
-#' @importFrom DBI dbConnect dbDisconnect dbGetQuery
-#' @importFrom RSQLite SQLite
 #'
 #' @examples
 #' \dontrun{
@@ -462,10 +466,11 @@ summarize_block_risk <- function(line.risk, blocks, quantiles = c(0.25, 0.75),
 #' block.risk.treated <- treat_blocks(block.risk, line.risk)
 #' }
 #'
+#' @seealso \code{\link{pointdata_memory}}
+#'
 #' @export
 #'
-treat_blocks <- function(block.risk, line.risk) {
-
+treat_blocks <- function(block.risk, line.risk, in.memory = FALSE) {
   # Ensure the block.risk object has a pobs_mean column
   if (!("pobs_mean" %in% colnames(block.risk)) )
     stop("Argument block.risk should have a column pobs_mean")
@@ -475,12 +480,38 @@ treat_blocks <- function(block.risk, line.risk) {
   else if (!inherits(line.risk, "risk"))
     stop("Argument line.risk should be a risk data frame or the path to a database file")
 
-  # FIXME
-  line.risk$locationid <- as.character(line.risk$locationid)
+  if (in.memory)
+    do_treat_blocks_mem(block.risk, line.risk)
+  else
+    do_treat_blocks_db(block.risk, line.risk)
+}
 
+
+# Private version of treat_blocks that loads data into memory
+#
+#' @importFrom dplyr %>% group_by left_join mutate select summarize ungroup
+#' @importFrom DBI dbConnect dbDisconnect
+#' @importFrom RSQLite SQLite
+#
+do_treat_blocks_mem <- function(block.risk, line.risk) {
+
+  # browser()
+
+  # load point data from database
   con <- dbConnect(SQLite(), dbname = attr(line.risk, "dbname"))
+  pointdata <- dbReadTable(con, "pointdata")
+  dbDisconnect(con)
 
+  # get indices of intersecting scan lines for each block
   intersections <- lines_in_blocks(block.risk, line.risk, by = "block")
+
+  # reduce line.risk to a plain data frame with IDs and the variables
+  # needed for risk calculation
+  line.risk <- line.risk %>%
+    as.data.frame() %>%
+    select(locationid, lineid, forest_p, distance, is_west) %>%
+    mutate(locationid = as.character(locationid))
+
 
   blocks.with.lines <- which(sapply(intersections, length) > 0)
 
@@ -495,49 +526,149 @@ treat_blocks <- function(block.risk, line.risk) {
   # within the block, set time since fire of those points to zero,
   # re-calculate line risk values, and summarize for the block.
 
-  sql <- "SELECT * FROM pointdata WHERE locationid = :loc and lineid = :line"
+  block.risk$ptreat_mean <- block.risk$pobs_mean
+
+  k <- 0
+  pb <- txtProgressBar(0, length(blocks.with.lines), style = 3)
+
+  for (iblock in blocks.with.lines) {
+    ii <- intersections[[iblock]]
+
+    pdat <- line.risk[ii, ] %>%
+      select(locationid, lineid) %>%
+      left_join(pointdata, by = c("locationid", "lineid"))
+
+    # Set time since fire of points within the block
+    # to zero
+    pts <- lapply(1:nrow(pdat), function(i) st_point(c(pdat$x[i], pdat$y[i])) )
+    pts <- st_sfc(pts, crs = st_crs(block.risk))
+
+    ii <- st_intersects(block.risk[iblock, ], pts)[[1]]
+
+    # It is possible to have a scan line that intersects the block
+    # has no sample points in the block (so nothing to do).
+    #
+    if (length(ii) > 0) {
+      pdat$tsf[ii] <- 0
+
+      # Calculate updated line risk values
+      ldat <- pdat %>%
+        group_by(locationid, lineid) %>%
+        summarize(tsf_treat_mean = mean(tsf, na.rm = TRUE)) %>%
+        ungroup() %>%
+
+        left_join(line.risk, by = c("locationid", "lineid")) %>%
+
+        mutate(ptreat = calculate_line_risk(tsf_mean = tsf_treat_mean,
+                                            forest_p = forest_p,
+                                            distance = distance,
+                                            is_west = is_west))
+
+      block.risk$ptreat_mean[iblock] <- mean(ldat$ptreat, na.rm = TRUE)
+    }
+
+    k <- k + 1
+    setTxtProgressBar(pb, k)
+  }
+  close(pb)
+
+  block.risk
+}
+
+
+# Private version of treat_blocks working with data in database
+#
+#' @importFrom dplyr %>% collect filter group_by left_join mutate summarize tbl ungroup
+#' @importFrom DBI dbConnect dbDisconnect
+#' @importFrom RSQLite SQLite
+#
+do_treat_blocks_db <- function(block.risk, line.risk) {
+  # open database and get source object for pointdata table
+  con <- dbConnect(SQLite(), dbname = attr(line.risk, "dbname"))
+  pointdata_tbl <- tbl(con, "pointdata")
+
+  # get indices of intersecting scan lines for each block
+  intersections <- lines_in_blocks(block.risk, line.risk, by = "block")
+
+  # reduce line.risk to a plain data frame with IDs and the variables
+  # needed for risk calculation
+  line.risk <- line.risk %>%
+    as.data.frame() %>%
+    select(locationid, lineid, forest_p, distance, is_west) %>%
+    mutate(locationid = as.character(locationid))
+
+
+  blocks.with.lines <- which(sapply(intersections, length) > 0)
+
+  if (length(blocks.with.lines) == 0) {
+    warning("No intersecting scan lines found for any block.\n")
+    block.risk$ptreat_mean <- block.risk$pobs_mean
+    return(block.risk)
+  }
+
+
+  # Insert a temporary table into the database with index of block and
+  # locationid and lineid for scan line
+  loclines <- lapply(blocks.with.lines, function(blockindex) {
+    ii <- intersections[[blockindex]]
+
+    data.frame(blockindex,
+               locationid = line.risk$locationid[ii],
+               lineid = line.risk$lineid[ii],
+               stringsAsFactors = FALSE)
+  })
+
+  loclines <- do.call(rbind, loclines) %>%
+    copy_to(con, ., "loclines",
+            overwrite = TRUE, temporary = TRUE,
+            indexes = list(
+              "blockindex",
+              c("locationid", "lineid")
+            ) )
+
+
+  # For each block intersected by scan lines, identify sample points
+  # within the block, set time since fire of those points to zero,
+  # re-calculate line risk values, and summarize for the block.
 
   block.risk$ptreat_mean <- block.risk$pobs_mean
 
   k <- 0
   pb <- txtProgressBar(0, length(blocks.with.lines), style = 3)
+
   for (iblock in blocks.with.lines) {
-    ii <- intersections[[iblock]]
-    nlines <- length(ii)
-
-    # Get point data for these scan lines
-    pdat <- lapply(ii, function(i) {
-      params <- list(loc = line.risk$locationid[i],
-                     line = line.risk$lineid[i])
-
-      dbGetQuery(con, sql, params = params)
-    })
-
-    pdat <- do.call(rbind, pdat)
-
+    pdat <- filter(loclines, blockindex == iblock) %>%
+      left_join(pointdata_tbl, by = c("locationid", "lineid")) %>%
+      collect()
 
     # Set time since fire of points within the block
     # to zero
-    pdat <- st_as_sf(pdat, coords = c("x", "y"), crs = st_crs(block.risk))
-    ii <- st_intersects(pdat, block.risk[iblock, ])
-    ii <- sapply(ii, length) > 0
+    pts <- lapply(1:nrow(pdat), function(i) st_point(c(pdat$x[i], pdat$y[i])) )
+    pts <- st_sfc(pts, crs = st_crs(block.risk))
 
-    pdat$tsf[ii] <- 0
+    ii <- st_intersects(block.risk[iblock, ], pts)[[1]]
 
-    # Calculate updated line risk values
-    ldat <- pdat %>%
-      group_by(locationid, lineid) %>%
-      summarize(tsf_treat_mean = mean(tsf, na.rm = TRUE)) %>%
-      ungroup() %>%
+    # It is possible to have a scan line that intersects the block
+    # has no sample points in the block (so nothing to do).
+    #
+    if (length(ii) > 0) {
+      pdat$tsf[ii] <- 0
 
-      left_join(as.data.frame(line.risk), by = c("locationid", "lineid")) %>%
+      # Calculate updated line risk values
+      ldat <- pdat %>%
+        group_by(locationid, lineid) %>%
+        summarize(tsf_treat_mean = mean(tsf, na.rm = TRUE)) %>%
+        ungroup() %>%
 
-      mutate(ptreat = calculate_line_risk(tsf_mean = tsf_treat_mean,
-                                          forest_p = forest_p,
-                                          distance = distance,
-                                          is_west = is_west))
+        left_join(line.risk, by = c("locationid", "lineid")) %>%
 
-    block.risk$ptreat_mean[iblock] <- mean(ldat$ptreat, na.rm = TRUE)
+        mutate(ptreat = calculate_line_risk(tsf_mean = tsf_treat_mean,
+                                            forest_p = forest_p,
+                                            distance = distance,
+                                            is_west = is_west))
+
+      block.risk$ptreat_mean[iblock] <- mean(ldat$ptreat, na.rm = TRUE)
+    }
 
     k <- k + 1
     setTxtProgressBar(pb, k)
@@ -581,5 +712,48 @@ load_line_risk_table <- function(path) {
   attr(dat, "dbname") <- normalizePath(path)
 
   dat
+}
+
+
+#' Estimate total memory required to load sample point data
+#'
+#' Sample point data for scan lines is held in a SQLite database file.
+#' This function estimates the total memory required to have all
+#' point data in memory simultaneously. You can use it to check
+#' whether it is safe to run the \code{treat_blocks} function with
+#' \code{in.memory = TRUE} for faster calculations.
+#'
+#' @param path Either a character string giving the path and filename
+#'   of the SQLite database, or a \code{risk} data frame as returned by
+#'   function \code{calculate_risk} which has the path to the database
+#'   as an attribute.
+#'
+#' @param units Units in which to report the memory requirement.
+#'
+#' @return Estimated total memory required.
+#'
+#' @importFrom DBI dbConnect dbGetQuery dbDisconnect
+#' @importFrom RSQLite SQLite
+#'
+#' @export
+#'
+pointdata_memory <- function(path, units = c("Mb", "Gb")) {
+  units <- match.arg(units)
+
+  if (inherits(path, "risk"))
+    path <- attr(path, "dbname")
+
+  con <- dbConnect(SQLite(), path)
+
+  x <- dbGetQuery(con, "select count(x) as N from pointdata limit 100")
+  dat <- dbGetQuery(con, "select * from pointdata")
+
+  dbDisconnect(con)
+
+  sz <- x$N[1] * as.numeric(object.size(dat)) / nrow(dat)
+
+  switch(units,
+         Mb = sz / 2^20,
+         Gb = sz / 2^30)
 }
 

@@ -46,9 +46,11 @@
 #' #
 #' lines <- make_scan_lines(80, pts, lengths = 5000, crs = 28355)
 #'
-#' # Variable line lengths from an exponential distribution
-#' # with mean length 5km (95% bounds: 125m - 18.4km).
-#' fun <- function(n) rexp(n, 1 / 5000)
+#' # Variable line lengths from a truncated exponential distribution
+#' # shifted so that minimum line length is 500m, with upper limit set
+#' # so that maximum line length is 20km
+#' #
+#' fun <- function(n) 500 + rexp_truncated(n, 1/5000, 19500)
 #' lines <- make_scan_lines(80, pts, lengths = fun)
 #'
 #' @export
