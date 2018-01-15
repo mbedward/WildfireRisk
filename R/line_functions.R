@@ -188,8 +188,9 @@ make_scan_lines <- function(locations, nlines, lengths, angles = NULL, crs = NUL
 sample_raster <- function(x, lines, spacing = NULL) {
 
   if (inherits(x, "Raster")) {
+    nm <- deparse(substitute(x))
     x <- list(x)
-    names(x) <- deparse(substitute(x))
+    names(x) <- nm
   }
   else if (is.list(x)) {
     # check all list elements are rasters
@@ -251,6 +252,85 @@ sample_raster <- function(x, lines, spacing = NULL) {
   data.frame(dat, vals)
 }
 
+
+
+#' Sample one or more raster layers at the distal point of each scan line
+#'
+#' This function takes one or more raster layers along with a \code{sf} data frame
+#' of scan lines (as produced by \code{make_scan_lines}) and samples raster values
+#' at the distal point of each scan line.
+#'
+#' @note If a raster object has multiple layers (ie. a RasterStack or RasterBrick
+#'   object) a warning will be issued and only the first layer will be sampled.
+#'
+#' @param x Either a single Raster object or a list of Raster objects to sample.
+#'   If a named list, the names will be used as the column names for sample values
+#'   in the returned data frame.
+#'
+#' @param lines An \code{sf} object containing scan lines for point locations.
+#'
+#' @return A data frame with columns: locationid, lineid (both taken from the input
+#'   \code{lines} object), x and y ordinates of line endpoint,
+#'   and a column of sample values for each of the input rasters.
+#'
+#' @examples
+#' \dontrun{
+#'
+#' # Sample a single raster layer of ignition probabilities.
+#' line.igprob <- sample_raster(r.ignition, lines)
+#'
+#' }
+#' @export
+sample_raster_endpoints <- function(x, lines) {
+
+  if (inherits(x, "Raster")) {
+    nm <- deparse(substitute(x))
+    x <- list(x)
+    names(x) <- nm
+  }
+  else if (is.list(x)) {
+    # check all list elements are rasters
+    is.r <- sapply(x, function(obj) inherits(obj, "Raster"))
+    if (!all(is.r)) stop("All elements in the input list must be Raster objects")
+
+    # check names and set if missing
+    nm <- names(x)
+    if (is.null(nm)) names(x) <- paste0("layer", 1:length(x))
+    else {
+      blanks <- nm == ""
+      if (any(blanks)) names(x)[blanks] <- paste0("layer", which(blanks))
+    }
+  }
+  else {
+    stop("x must be either a Raster object or a list of Raster objects")
+  }
+
+
+  x <- lapply(x, function(r) {
+    if (raster::nlayers(r) > 1) {
+      warning("Only sampling first layer of multi-layer raster")
+      r <- raster::subset(r, 1)
+    }
+    else r
+  })
+
+
+  # Coordinates of line distal end-points
+  xy <- st_coordinates(lines)[seq(2, 2*nrow(lines), 2), ]
+
+  # Extract values from rasters
+  vals <- lapply(x, function(r) {
+    raster::extract(r, xy[, 1:2])
+  })
+  names(vals) <- names(x)
+
+  # Return result
+  data.frame(locationid = lines$locationid,
+             lineid = lines$lineid,
+             x = xy[, 1],
+             y = xy[, 2],
+             vals)
+}
 
 
 #' Calculates line compass bearings

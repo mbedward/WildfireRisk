@@ -303,6 +303,112 @@ summarize_location_risk <- function(line.risk, quantiles = c(0.25, 0.75)) {
 }
 
 
+
+#' Summarize raster values in location neighbourhoods
+#'
+#' This function takes a set of scan lines, groups them by location, and summarizes
+#' the values of a given raster layer sampled at the distal end-point of each line.
+#' The resulting summary statistics can be taken as a profile of each location's
+#' neighbourhood. Typical use is with a raster layer of ignition probabilities.
+#' Statistics calculated include the mean and (optionally) specified quantiles.
+#'
+#' @param lines An \code{sf} object (spatial data frame) with scan lines
+#'   for each location at which to predict fire risk.
+#'
+#' @param layer The raster layer to sample.
+#'
+#' @param quantiles A vector of quantiles (probabilities with values in [0,1])
+#'   to calculate in addition to the mean. If \code{NULL} or an empty vector
+#'   no quantiles are calculated.
+#'
+#' @return An \code{sf} data frame of summary statistics for each location.
+#'
+#' @seealso \code{\link{summarize_location_risk}}
+#'
+#' @importFrom dplyr %>% do group_by
+#'
+#' @examples
+#' \dontrun{
+#'
+#' # Sample a raster layer of ignition probabilities to summarize the
+#' # likelihood of ignition in the neighbourhood of each asset location
+#'
+#' ignition.locations <- summarize_location_nbrhood(lines, r.ignition.prob)
+#'
+#' }
+#'
+#' @export
+#'
+summarize_location_nbrhood <- function(lines, layer, quantiles = c(0.25, 0.75)) {
+
+  # Helper function to retrieve central point from a
+  # set of scan lines
+  firstpoint <- function(lines) {
+    m <- st_coordinates(lines)
+    data.frame(x = m[1,1], y = m[1,2])
+  }
+
+  has.quantiles <- !is.null(quantiles) & length(quantiles) > 0
+
+  if (has.quantiles) {
+    qnames <- names(quantile(1, quantiles)) %>% stringr::str_replace("\\%", "")
+  }
+
+  # Get point locations
+  loc <- lines %>%
+    group_by(locationid) %>%
+    do(firstpoint(.$geometry))
+
+
+  # Helper function to calculate mean and quantiles and
+  # return them as a data frame
+  fn <- function(x, varname) {
+    d <- data.frame(mu = mean(x, na.rm = TRUE))
+    colnames(d) <- paste(varname, "mean", sep = "_")
+
+    if (has.quantiles) {
+      q <- quantile(x, probs = quantiles, na.rm = TRUE)
+      q <- t(q)
+      colnames(q) <- paste(varname, qnames, sep = "_")
+
+      d <- cbind(d, q)
+    }
+
+    d
+  }
+
+  # Sample line distal end-points
+  lin <- list(layer)
+  names(lin) <- "layer"
+  dat <- sample_raster_endpoints(lin, lines)
+
+
+  # Summary statistics for each location
+  pstats <- dat %>%
+
+    # calculate mean probabilities
+    group_by(locationid) %>%
+
+    do(
+      fn(.$layer, "layer")
+    ) %>%
+
+    ungroup() %>%
+
+    # join location data
+    left_join(loc, by = "locationid") %>%
+
+    # convert to a spatial (sf) object with point geometry
+    st_as_sf(coords = c("x", "y"))
+
+
+  # Set coordinate reference system
+  st_crs(pstats) <- st_crs(lines)
+
+  pstats
+}
+
+
 #' Summarize scan line risk values for landscape blocks
 #'
 #' This function takes a set of risk values for scan lines,

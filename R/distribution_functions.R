@@ -28,7 +28,7 @@ rexp_truncated <- function(n, rate, upper) {
 #'
 #' @param x Vector of values.
 #' @param rate Rate parameter.
-#' @upper Upper (right-hand) limit of the distribution.
+#' @param upper Upper (right-hand) limit of the distribution.
 #'
 #' @export
 #'
@@ -52,7 +52,7 @@ dexp_truncated <- function(x, rate, upper) {
 #'
 #' @param x Vector of values.
 #' @param rate Rate parameter.
-#' @upper Upper (right-hand) limit of the distribution.
+#' @param upper Upper (right-hand) limit of the distribution.
 #'
 #' @export
 #'

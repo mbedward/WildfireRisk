@@ -10,6 +10,8 @@ pexp_truncated(x, rate, upper)
 \item{x}{Vector of values.}
 
 \item{rate}{Rate parameter.}
+
+\item{upper}{Upper (right-hand) limit of the distribution.}
 }
 \description{
 For each value in the vector \code{x}, returns the probability

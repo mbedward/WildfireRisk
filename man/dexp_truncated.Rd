@@ -10,6 +10,8 @@ dexp_truncated(x, rate, upper)
 \item{x}{Vector of values.}
 
 \item{rate}{Rate parameter.}
+
+\item{upper}{Upper (right-hand) limit of the distribution.}
 }
 \description{
 Any values \code{<=0} or \code{>upper} will have density zero.
