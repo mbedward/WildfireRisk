@@ -1,0 +1,24 @@
+<PAMDataset>
+  <PAMRasterBand band="1">
+    <Description>temp2016</Description>
+    <NoDataValue>2.14748364700000E+09</NoDataValue>
+    <Histograms>
+      <HistItem>
+        <HistMin>-0.4897959183673469</HistMin>
+        <HistMax>48.48979591836735</HistMax>
+        <BucketCount>49</BucketCount>
+        <IncludeOutOfRange>0</IncludeOutOfRange>
+        <Approximate>0</Approximate>
+        <HistCounts>671|3769|536|1396|48403|6227|2574|3536|3710|1593|1920|34779|1549|485|8756|85880|71962|477|0|86|15633|972|1400|1569|35497|294|1196|1427|824|237|251|1365|266|307|68|2079|627|2847|6577|47|2681|675|39|68|13|1241|327|11|110613</HistCounts>
+      </HistItem>
+    </Histograms>
+    <Metadata>
+      <MDI key="BandName">temp2016</MDI>
+      <MDI key="RepresentationType">ATHEMATIC</MDI>
+      <MDI key="STATISTICS_MAXIMUM">48</MDI>
+      <MDI key="STATISTICS_MEAN">22.931350275959</MDI>
+      <MDI key="STATISTICS_MINIMUM">0</MDI>
+      <MDI key="STATISTICS_STDDEV">15.643200183435</MDI>
+    </Metadata>
+  </PAMRasterBand>
+</PAMDataset>

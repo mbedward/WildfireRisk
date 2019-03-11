@@ -1,0 +1,24 @@
+<PAMDataset>
+  <PAMRasterBand band="1">
+    <Description>act_for_55m</Description>
+    <NoDataValue>2.14748364700000E+09</NoDataValue>
+    <Histograms>
+      <HistItem>
+        <HistMin>-0.25</HistMin>
+        <HistMax>1.25</HistMax>
+        <BucketCount>2</BucketCount>
+        <IncludeOutOfRange>0</IncludeOutOfRange>
+        <Approximate>1</Approximate>
+        <HistCounts>105331|123379</HistCounts>
+      </HistItem>
+    </Histograms>
+    <Metadata>
+      <MDI key="BandName">act_for_55m</MDI>
+      <MDI key="RepresentationType">ATHEMATIC</MDI>
+      <MDI key="STATISTICS_MAXIMUM">1</MDI>
+      <MDI key="STATISTICS_MEAN">0.53945607975165</MDI>
+      <MDI key="STATISTICS_MINIMUM">0</MDI>
+      <MDI key="STATISTICS_STDDEV">0.49844078662428</MDI>
+    </Metadata>
+  </PAMRasterBand>
+</PAMDataset>
